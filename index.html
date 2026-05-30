@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>縦型名刺作成ジェネレーター（画像保存機能付き）</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #f0f3f5;
+            --card-bg: #ffffff;
+            --text-main: #1a1a1a;
+            --text-sub: #555555;
+            --accent-red: #e60012;
+            --border-color: #dcdde1;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: row;
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.08);
+            padding: 35px;
+            gap: 40px;
+            max-width: 850px;
+            width: 100%;
+            align-items: center;
+        }
+
+        /* 入力フォームエリア */
+        .form-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-section h2 {
+            margin-top: 0;
+            margin-bottom: 25px;
+            font-size: 22px;
+            color: var(--text-main);
+            border-left: 4px solid var(--accent-red);
+            padding-left: 12px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            color: var(--text-main);
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 14px;
+            box-sizing: border-box;
+            transition: all 0.3s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--accent-red);
+            box-shadow: 0 0 0 3px rgba(230, 0, 18, 0.1);
+        }
+
+        /* ダウンロードボタン */
+        .download-btn {
+            background-color: var(--accent-red);
+            color: #ffffff;
+            border: none;
+            padding: 14px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            margin-top: 10px;
+            box-shadow: 0 4px 12px rgba(230, 0, 18, 0.2);
+        }
+
+        .download-btn:hover {
+            background-color: #cc0010;
+        }
+
+        .download-btn:active {
+            transform: scale(0.98);
+        }
+
+        /* プレビューエリア */
+        .preview-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #fafafa;
+            border-radius: 12px;
+            padding: 30px;
+            border: 1px dashed var(--border-color);
+        }
+
+        .preview-section h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 13px;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        /* 縦型名刺デザイン（91:55比率） */
+        .vertical-card {
+            width: 275px;
+            height: 455px;
+            background-color: var(--card-bg);
+            border-radius: 2px;
+            position: relative;
+            padding: 35px 25px 30px 25px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            /* 枠線と影は保存時に邪魔にならないよう、プレビューのラッパー側で制御します */
+        }
+
+        /* プレビューの見た目用の影（画像保存時には含まれません） */
+        .card-shadow-wrapper {
+            box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+            border: 1px solid #e1e1e1;
+            border-radius: 2px;
+        }
+
+        /* ロゴエリア */
+        .card-logo-container {
+            width: 100%;
+            height: 90px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .card-logo-image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        /* QRコードエリア */
+        .card-qr-container {
+            width: 75px;
+            height: 75px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 5px;
+        }
+
+        /* URL未入力時のダミー枠 */
+        .qr-placeholder {
+            width: 100%;
+            height: 100%;
+            border: 1px dashed #cbd5e0;
+            border-radius: 4px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 9px;
+            color: #a0aec0;
+            text-align: center;
+        }
+
+        /* 氏名エリア */
+        .card-name-block {
+            text-align: center;
+            width: 100%;
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
+
+        .card-name {
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--text-main);
+            letter-spacing: 3px;
+            margin: 0;
+        }
+
+        /* 下部情報エリア */
+        .card-info-block {
+            width: 100%;
+            font-size: 11px;
+            color: var(--text-sub);
+            line-height: 1.8;
+            border-top: 1px solid #f0f0f0;
+            padding-top: 15px;
+            text-align: left;
+        }
+
+        .info-item {
+            display: flex;
+            margin-bottom: 4px;
+        }
+
+        .info-label {
+            width: 40px;
+            color: #b0b0b0;
+            font-weight: bold;
+        }
+
+        .info-value {
+            word-break: break-all;
+        }
+
+        /* レスポンシブ対応 */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+                padding: 20px;
+            }
+            .vertical-card {
+                width: 240px;
+                height: 397px;
+                padding: 25px 20px;
+            }
+            .card-name {
+                font-size: 22px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="form-section">
+        <h2>名刺情報入力</h2>
+        
+        <div class="input-group">
+            <label for="input-name">氏名</label>
+            <input type="text" id="input-name" placeholder="山田 太郎" autocomplete="off">
+        </div>
+        
+        <div class="input-group">
+            <label for="input-phone">電話番号</label>
+            <input type="tel" id="input-phone" placeholder="090-1234-5678" autocomplete="off">
+        </div>
+        
+        <div class="input-group">
+            <label for="input-email">メールアドレス</label>
+            <input type="email" id="input-email" placeholder="example@email.com" autocomplete="off">
+        </div>
+
+        <div class="input-group">
+            <label for="input-fb">Facebook URL</label>
+            <input type="url" id="input-fb" placeholder="https://www.facebook.com/username" autocomplete="off">
+        </div>
+
+        <button class="download-btn" id="download-btn">名刺画像を保存する</button>
+    </div>
+
+    <div class="preview-section">
+        <h3>Preview</h3>
+        <div class="card-shadow-wrapper">
+            <div class="vertical-card" id="business-card">
+                
+                <div class="card-logo-container">
+                    <img src="https://images.tcdn.jp/img/images/000/112/575/e6b221d60db26645db7bc1bf1fe4f4ea7a1f59ff_l.png" alt="#東福推飯" class="card-logo-image" id="card-logo-img" crossorigin="anonymous" onerror="this.src='unnamed.png'">
+                </div>
+
+                <div class="card-qr-container">
+                    <div id="qrcode-box" style="display:none;"></div>
+                    <div id="qr-placeholder" class="qr-placeholder">Facebook<br>URL未入力</div>
+                </div>
+                
+                <div class="card-name-block">
+                    <div class="card-name" id="card-name">（氏名未入力）</div>
+                </div>
+                
+                <div class="card-info-block">
+                    <div class="info-item">
+                        <span class="info-label">TEL</span>
+                        <span class="info-value" id="card-phone">--</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">MAIL</span>
+                        <span class="info-value" id="card-email">--</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const inputName = document.getElementById('input-name');
+    const inputPhone = document.getElementById('input-phone');
+    const inputEmail = document.getElementById('input-email');
+    const inputFb = document.getElementById('input-fb');
+
+    const cardName = document.getElementById('card-name');
+    const cardPhone = document.getElementById('card-phone');
+    const cardEmail = document.getElementById('card-email');
+    
+    const qrcodeBox = document.getElementById('qrcode-box');
+    const qrPlaceholder = document.getElementById('qr-placeholder');
+    const downloadBtn = document.getElementById('download-btn');
+    const businessCard = document.getElementById('business-card');
+
+    // QRコード生成
+    const qrcode = new QRCode(qrcodeBox, {
+        width: 75,
+        height: 75,
+        correctLevel: QRCode.CorrectLevel.H
+    });
+
+    // リアルタイム反映処理
+    inputName.addEventListener('input', (e) => {
+        cardName.textContent = e.target.value.trim() || '（氏名未入力）';
+    });
+
+    inputPhone.addEventListener('input', (e) => {
+        cardPhone.textContent = e.target.value.trim() || '--';
+    });
+
+    inputEmail.addEventListener('input', (e) => {
+        cardEmail.textContent = e.target.value.trim() || '--';
+    });
+
+    inputFb.addEventListener('input', (e) => {
+        const url = e.target.value.trim();
+        if (url) {
+            qrcode.clear();
+            qrcode.makeCode(url);
+            qrcodeBox.style.display = 'block';
+            qrPlaceholder.style.display = 'none';
+        } else {
+            qrcodeBox.style.display = 'none';
+            qrPlaceholder.style.display = 'flex';
+        }
+    });
+
+    // 画像ダウンロード処理
+    downloadBtn.addEventListener('click', () => {
+        // html2canvasで名刺エリアを高解像度でキャプチャ
+        html2canvas(businessCard, {
+            scale: 3, // 印刷や拡大に耐えられるよう、3倍の解像度で綺麗に出力
+            useCORS: true, // 外部URLのロゴ画像（CORS）を許可してキャプチャに含める
+            backgroundColor: "#ffffff"
+        }).then(canvas => {
+            // 画像データ（データURL）を取得
+            const imgData = canvas.toDataURL('image/png');
+            
+            // 擬似的なリンクを作って自動クリック（ダウンロード発火）
+            const link = document.createElement('a');
+            link.href = imgData;
+            link.download = '名刺_' + (inputName.value.trim() || 'shihan') + '.png';
+            link.click();
+        }).catch(err => {
+            console.error('画像の生成に失敗しました:', err);
+            alert('画像の保存中にエラーが発生しました。');
+        });
+    });
+</script>
+
+</body>
+</html>
