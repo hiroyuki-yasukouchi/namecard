@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>縦型名刺作成ジェネレーター（画像保存機能付き）</title>
+    <title>縦型名刺作成ジェネレーター</title>
+    <!-- QRコード生成ライブラリ -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- HTML要素を画像化するライブラリ -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         :root {
@@ -69,7 +71,7 @@
             color: var(--text-main);
         }
 
-        .input-group input {
+        .input-group input, .input-group select {
             width: 100%;
             padding: 12px;
             border: 1px solid var(--border-color);
@@ -77,9 +79,10 @@
             font-size: 14px;
             box-sizing: border-box;
             transition: all 0.3s;
+            background-color: #fff;
         }
 
-        .input-group input:focus {
+        .input-group input:focus, .input-group select:focus {
             outline: none;
             border-color: var(--accent-red);
             box-shadow: 0 0 0 3px rgba(230, 0, 18, 0.1);
@@ -143,10 +146,9 @@
             flex-direction: column;
             align-items: center;
             justify-content: space-between;
-            /* 枠線と影は保存時に邪魔にならないよう、プレビューのラッパー側で制御します */
         }
 
-        /* プレビューの見た目用の影（画像保存時には含まれません） */
+        /* プレビューの見た目用の影 */
         .card-shadow-wrapper {
             box-shadow: 0 8px 25px rgba(0,0,0,0.08);
             border: 1px solid #e1e1e1;
@@ -192,12 +194,20 @@
             text-align: center;
         }
 
-        /* 氏名エリア */
+        /* 氏名・肩書エリア */
         .card-name-block {
             text-align: center;
             width: 100%;
             margin-top: 10px;
             margin-bottom: 10px;
+        }
+
+        .card-title {
+            font-size: 12px;
+            color: var(--text-sub);
+            letter-spacing: 2px;
+            margin-bottom: 5px;
+            min-height: 18px;
         }
 
         .card-name {
@@ -254,9 +264,19 @@
 <body>
 
 <div class="container">
+    <!-- 入力フォーム -->
     <div class="form-section">
         <h2>名刺情報入力</h2>
         
+        <div class="input-group">
+            <label for="input-title">肩書</label>
+            <select id="input-title">
+                <option value="主宰">主宰</option>
+                <option value="インフルエンサー">インフルエンサー</option>
+                <option value="マネージャー">マネージャー</option>
+            </select>
+        </div>
+
         <div class="input-group">
             <label for="input-name">氏名</label>
             <input type="text" id="input-name" placeholder="山田 太郎" autocomplete="off">
@@ -277,27 +297,35 @@
             <input type="url" id="input-fb" placeholder="https://www.facebook.com/username" autocomplete="off">
         </div>
 
+        <!-- 画像保存ボタン -->
         <button class="download-btn" id="download-btn">名刺画像を保存する</button>
     </div>
 
+    <!-- プレビュー表示 -->
     <div class="preview-section">
         <h3>Preview</h3>
         <div class="card-shadow-wrapper">
+            <!-- 実際に画像化されるエリア -->
             <div class="vertical-card" id="business-card">
                 
+                <!-- 上部：ロゴ画像（images/logo.png を指定） -->
                 <div class="card-logo-container">
-                    <img src="https://images.tcdn.jp/img/images/000/112/575/e6b221d60db26645db7bc1bf1fe4f4ea7a1f59ff_l.png" alt="#東福推飯" class="card-logo-image" id="card-logo-img" crossorigin="anonymous" onerror="this.src='unnamed.png'">
+                    <img src="images/logo.png" alt="#東福推飯" class="card-logo-image" id="card-logo-img">
                 </div>
 
+                <!-- ロゴの下：QRコード配置エリア -->
                 <div class="card-qr-container">
                     <div id="qrcode-box" style="display:none;"></div>
                     <div id="qr-placeholder" class="qr-placeholder">Facebook<br>URL未入力</div>
                 </div>
                 
+                <!-- 中央：肩書 ＆ 氏名 -->
                 <div class="card-name-block">
+                    <div class="card-title" id="card-title">主宰</div>
                     <div class="card-name" id="card-name">（氏名未入力）</div>
                 </div>
                 
+                <!-- 下部：連絡先 -->
                 <div class="card-info-block">
                     <div class="info-item">
                         <span class="info-label">TEL</span>
@@ -314,11 +342,13 @@
 </div>
 
 <script>
+    const inputTitle = document.getElementById('input-title');
     const inputName = document.getElementById('input-name');
     const inputPhone = document.getElementById('input-phone');
     const inputEmail = document.getElementById('input-email');
     const inputFb = document.getElementById('input-fb');
 
+    const cardTitle = document.getElementById('card-title');
     const cardName = document.getElementById('card-name');
     const cardPhone = document.getElementById('card-phone');
     const cardEmail = document.getElementById('card-email');
@@ -336,6 +366,10 @@
     });
 
     // リアルタイム反映処理
+    inputTitle.addEventListener('change', (e) => {
+        cardTitle.textContent = e.target.value;
+    });
+
     inputName.addEventListener('input', (e) => {
         cardName.textContent = e.target.value.trim() || '（氏名未入力）';
     });
@@ -363,23 +397,18 @@
 
     // 画像ダウンロード処理
     downloadBtn.addEventListener('click', () => {
-        // html2canvasで名刺エリアを高解像度でキャプチャ
         html2canvas(businessCard, {
-            scale: 3, // 印刷や拡大に耐えられるよう、3倍の解像度で綺麗に出力
-            useCORS: true, // 外部URLのロゴ画像（CORS）を許可してキャプチャに含める
+            scale: 3, 
             backgroundColor: "#ffffff"
         }).then(canvas => {
-            // 画像データ（データURL）を取得
             const imgData = canvas.toDataURL('image/png');
-            
-            // 擬似的なリンクを作って自動クリック（ダウンロード発火）
             const link = document.createElement('a');
             link.href = imgData;
             link.download = '名刺_' + (inputName.value.trim() || 'shihan') + '.png';
             link.click();
         }).catch(err => {
             console.error('画像の生成に失敗しました:', err);
-            alert('画像の保存中にエラーが発生しました。');
+            alert('画像の保存中にエラーが発生しました。ネット上（サーバー環境）にアップロードして再度お試しください。');
         });
     });
 </script>
